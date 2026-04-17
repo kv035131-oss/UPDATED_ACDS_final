@@ -24,17 +24,7 @@ app = FastAPI(title='ACDS — AI Cyber Defense System', version='4.1.0')
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        'http://localhost:5173',
-        'http://localhost:5174',
-        'http://localhost:5175',
-        'http://localhost:5176',
-        'http://localhost:3000',
-        'http://127.0.0.1:5173',
-        'http://127.0.0.1:5174',
-        'http://127.0.0.1:5175',
-        'http://127.0.0.1:3000',
-    ],
+    allow_origins=['*'],
     allow_methods=['*'],
     allow_headers=['*'],
 )
@@ -695,6 +685,39 @@ def stop_live_monitor():
 def status_live_monitor():
     is_running = live_process is not None and live_process.poll() is None
     return {"is_running": is_running}
+
+# ── HONEYPOT / LOGIN SIMULATOR ───────────────────────────────────────────────
+@app.post('/api/login')
+@app.get('/api/login')
+async def fake_login_honeypot(request: Request):
+    """
+    Acts as a honeypot to catch real-world brute force tools like Hydra.
+    Captures the attacker's real IP, logs it to ACDS, and always returns 401.
+    """
+    client_ip = request.client.host if request.client else "unknown"
+    
+    # ── 1. Create a raw application-layer log
+    raw_event = {
+        'layer': 'application',
+        'status_code': 401,
+        'endpoint': '/api/login',
+        'src_ip': client_ip,
+        'method': request.method,
+        'message': "Authentic honeypot login failure"
+    }
+
+    # ── 2. Normalize and analyze in real-time
+    normalized = normalize(raw_event)
+    alerts = engine.detect(normalized)
+    
+    if alerts:
+        alert_store.extend(alerts)
+        await broadcast(alerts)
+        
+    # ── 3. Reject the request
+    from fastapi.responses import JSONResponse
+    return JSONResponse(status_code=401, content={"error": "Unauthorized", "message": "Invalid credentials"})
+
 
 # ═══════════════════════════════════════════════════════════════════════════
 # PAGE 06 — DEPLOY SHIELD (Log Monitor ON/OFF)
