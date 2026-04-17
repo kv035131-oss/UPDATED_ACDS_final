@@ -736,7 +736,12 @@ def geo_lookup(ip: str):
 
     import requests as req
     try:
-        r = req.get(f'http://ip-api.com/json/{ip}', timeout=5)
+        if ip.startswith('192.168.') or ip.startswith('10.') or ip.startswith('127.') or ip.startswith('172.') or ip == 'localhost':
+            url = 'http://ip-api.com/json/'
+        else:
+            url = f'http://ip-api.com/json/{ip}'
+            
+        r = req.get(url, timeout=5)
         data = r.json()
 
         result = {'ip': ip, 'country': None, 'country_code': None,
